@@ -1,60 +1,61 @@
 import os
 import sys
-import time
-from threading import Thread
+import asyncio
+import qasync
 from PyQt6.QtCore import pyqtSignal, Qt
-from PyQt6 import QtWidgets
-from PyQt6.uic.load_ui import loadUi
-from app_updater.check_for_update import Release, check_for_updates, download_release
+from PyQt6 import QtWidgets, QtGui
+from app_updater.check_for_update import (Release, check_for_updates,
+                                          download_release)
 
 
 class UpdateCheckerDialog(QtWidgets.QWidget):
-    disable_updates: pyqtSignal = pyqtSignal()
-    redraw_progress_bar: pyqtSignal = pyqtSignal(int)
     download_finished: pyqtSignal = pyqtSignal(int)
 
     progress_bar: QtWidgets.QProgressBar
     label: QtWidgets.QLabel
-    changelog_viewer: QtWidgets.QPlainTextEdit
+    changelog_viewer: QtWidgets.QTextBrowser
     close_button: QtWidgets.QPushButton
     update_button: QtWidgets.QPushButton
-    disable_updater_checkbox: QtWidgets.QCheckBox
-    def __init__(self, release: Release, frontend_file_name: str = 'frontend.ui') -> None:
+
+    def __init__(self, release: Release) -> None:
         super().__init__()
-        loadUi(os.path.join(os.path.dirname(__file__), f'{frontend_file_name}'), self)
+        font = QtGui.QFont()
+        font.setPixelSize(25)
+        font.setBold(True)
+        self.title_label = QtWidgets.QLabel('Обнаружена новая версия программы')
+        self.title_label.setAlignment(Qt.AlignmentFlag.AlignHCenter)
+        self.title_label.setFont(font)
+        self.version_label = QtWidgets.QLabel()
+        self.changelog_viewer = QtWidgets.QTextBrowser()
+        self.progress_bar = QtWidgets.QProgressBar()
+        self.main_layout = QtWidgets.QVBoxLayout()
+        self.main_layout.addWidget(self.title_label)
+        self.main_layout.addWidget(self.version_label)
+        self.main_layout.addWidget(self.changelog_viewer)
+        self.main_layout.addWidget(self.progress_bar)
+        self.buttons_layout = QtWidgets.QHBoxLayout()
+        self.close_button = QtWidgets.QPushButton('Закрыть')
+        self.update_button = QtWidgets.QPushButton('Обновить')
+        self.buttons_layout.addWidget(self.update_button)
+        self.buttons_layout.addWidget(self.close_button)
+        self.main_layout.addLayout(self.buttons_layout)
+        self.setLayout(self.main_layout)
+
         self.progress_bar.setVisible(False)
-        self.release_data: Release = release
-        self.label.setText(self.label.text()[:-1] + ' ' + self.release_data.name + ":")
-        self.changelog_viewer.setPlainText(self.release_data.body)
+        self.release: Release = release
+        self.version_label.setText(f'Список изменений {self.release.tag_name}:')
+        self.changelog_viewer.setMarkdown(self.release.body)
         self.setWindowFlag(Qt.WindowType.WindowMinMaxButtonsHint, False)
         self.setWindowFlag(Qt.WindowType.WindowShadeButtonHint, False)
         self.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint, True)
-        self.update_button.pressed.connect(self.download_update)
-        self.close_button.pressed.connect(self.close)  # type: ignore
-        self.disable_updater_checkbox.stateChanged.connect(self.checkbox_handler)
-        # self.download_process = DownloadProcess(self.release_data)
-        self.download_finished.connect(self.downoad_finished)
-        self.redraw_progress_bar.connect(self.progress_bar.setValue)
-
-        self.downloader: Thread = Thread(name='downloader', target=self.__download_release)
-        self.progress_bar_thread: Thread = Thread(name='progress_bar', target=self.__update_progress_bar)
-
-        self.new_name = f"KPA-{self.release_data.name}.exe"
-
-    def __download_release(self) -> None:
-        download_release(self.release_data, rename=self.new_name)
-        self.progress_bar.setVisible(False)
-        self.download_finished.emit(0)
-
-    def __update_progress_bar(self) -> None:
-        while self.release_data.download_progress < 100:
-            self.redraw_progress_bar.emit(self.release_data.download_progress)
-            time.sleep(0.2)
+        self.close_button.pressed.connect(self.close)
+        self.update_button.pressed.connect(self.on_download)
+        self.new_name: str = ''
 
     def downoad_finished(self) -> None:
-        dialog: QtWidgets.QMessageBox = QtWidgets.QMessageBox(icon=QtWidgets.QMessageBox.Icon.Information,
-                                                              title="Обновление успешно завершено",
-                                                              text="Программа будет перезапущена")
+        dialog = QtWidgets.QMessageBox(QtWidgets.QMessageBox.Icon.Information,
+                                       "Обновление успешно завершено",
+                                       "Программа будет перезапущена")
         dialog.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint, True)
         dialog.setWindowIcon(self.windowIcon())
         if dialog.exec():
@@ -65,37 +66,34 @@ class UpdateCheckerDialog(QtWidgets.QWidget):
             if ".exe" not in filename:
                 os.execv(sys.executable, ['python'] + sys.argv)
             else:
-                os.execv(exe_path.replace(exe_filename, self.new_name), ['python' + path.replace(filename,
-                                                                                                 self.new_name)])
+                os.execv(exe_path.replace(exe_filename, self.new_name),
+                         ['python' + path.replace(filename, self.new_name)])
 
-    def download_update(self) -> None:
-        self.downloader.start()
-        self.progress_bar_thread.start()
+    @qasync.asyncSlot()
+    async def on_download(self) -> None:
+        self.progress_bar.setValue(0)
         self.progress_bar.setVisible(True)
+        async for progress in download_release(self.release,
+                                               rename=self.new_name):
+            self.progress_bar.setValue(progress)
+        self.progress_bar.setVisible(False)
+        self.downoad_finished()
 
-    def save_checkbox_state(self) -> None:
-        if self.disable_updater_checkbox.isChecked():
-            self.disable_updates.emit()
-
-    def checkbox_handler(self, state: int) -> None:
-        if state:
-            print('automatic update check is disabled')
-        else:
-            print('automatic update check is enabled ')
-
-    def closeEvent(self, event) -> None:
-        self.save_checkbox_state()
-
-        # if self.downloader.is_alive():
-        #     terminate thread
-        event.accept()
 
 
 
 if __name__ == '__main__':
-    update = check_for_updates("OAI-NSU", "KPA-GUI")
+    url: str = ''
+    token: str = ''
+    update: Release | None = asyncio.run(check_for_updates(url, token))
     if update:
-        app: QtWidgets.QApplication = QtWidgets.QApplication(sys.argv)
+        app: QtWidgets.QApplication = QtWidgets.QApplication([])
+        event_loop = qasync.QEventLoop(app)
+        asyncio.set_event_loop(event_loop)
+        app_close_event = asyncio.Event()
+        app.aboutToQuit.connect(app_close_event.set)
         w: UpdateCheckerDialog = UpdateCheckerDialog(update)
         w.show()
-        app.exec()
+
+        with event_loop:
+            event_loop.run_until_complete(app_close_event.wait())
