@@ -1,9 +1,11 @@
 import os
 import sys
 import asyncio
+from pathlib import Path
 import qasync
 from PyQt6.QtCore import pyqtSignal, Qt
 from PyQt6 import QtWidgets, QtGui
+from loguru import logger
 from app_updater.check_for_update import (Release, check_for_updates,
                                           download_release)
 
@@ -50,7 +52,6 @@ class UpdateCheckerDialog(QtWidgets.QWidget):
         self.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint, True)
         self.close_button.pressed.connect(self.close)
         self.update_button.pressed.connect(self.on_download)
-        self.new_name: str = ''
 
     def downoad_finished(self) -> None:
         dialog = QtWidgets.QMessageBox(QtWidgets.QMessageBox.Icon.Information,
@@ -62,19 +63,27 @@ class UpdateCheckerDialog(QtWidgets.QWidget):
             path: str = sys.argv[0]
             filename: str = os.path.basename(path)
             exe_path: str = sys.executable
-            exe_filename: str = os.path.basename(exe_path)
-            if ".exe" not in filename:
-                os.execv(sys.executable, ['python'] + sys.argv)
-            else:
-                os.execv(exe_path.replace(exe_filename, self.new_name),
-                         ['python' + path.replace(filename, self.new_name)])
+            try:
+                if ".exe" in filename:
+                    new_exe_path = exe_path.replace(filename,
+                                                    self.release.exe_name)
+                    logger.debug(f'{new_exe_path=}')
+                    os.execv(new_exe_path, [new_exe_path])
+                else:
+                    new_exe_path: str = str(Path.cwd() / self.release.exe_name)
+                    logger.debug(f'You run script from sources. '\
+                                 f'For running exe open: {new_exe_path}')
+                #     logger.debug(f'{new_exe_path=}')
+                #     self.close()
+                #     os.system(new_exe_path)
+            except Exception as err:
+                logger.exception(err)
 
     @qasync.asyncSlot()
     async def on_download(self) -> None:
         self.progress_bar.setValue(0)
         self.progress_bar.setVisible(True)
-        async for progress in download_release(self.release,
-                                               rename=self.new_name):
+        async for progress in download_release(self.release):
             self.progress_bar.setValue(progress)
         self.progress_bar.setVisible(False)
         self.downoad_finished()
