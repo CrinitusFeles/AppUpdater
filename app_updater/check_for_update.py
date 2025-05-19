@@ -1,6 +1,6 @@
 import asyncio
 import json
-from packaging import Version
+from packaging.version import Version
 from typing import Any, AsyncGenerator
 import httpx
 from httpx import HTTPError, Response
