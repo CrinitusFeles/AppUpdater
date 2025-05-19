@@ -1,6 +1,6 @@
 import asyncio
 import json
-from distutils.version import StrictVersion
+from packaging import Version
 from typing import Any, AsyncGenerator
 import httpx
 from httpx import HTTPError, Response
@@ -61,7 +61,7 @@ def compare_version(v1: str, v2: str) -> bool:
         try:
             _v1: str = v1.replace('v', '')
             _v2: str = v2.replace('v', '')
-            return StrictVersion(_v1) > StrictVersion(_v2)
+            return Version(_v1) > Version(_v2)
         except ValueError as ex:
             logger.error(ex)
             logger.error(v1, v2)
