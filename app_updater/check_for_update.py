@@ -127,7 +127,7 @@ async def check_for_updates(url: str, token: str = '',
             return latest_release
         if compare_version(current_version, latest_release.tag_name):
             logger.warning(f'Warning! You did not update repository release! '\
-                           f'Your current version {current_version} fresher' \
+                           f'Your current version {current_version} fresher ' \
                            f'then latest repo {latest_release.tag_name}')
         else:
             logger.info('You use the latest version')

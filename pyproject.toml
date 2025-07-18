@@ -1,23 +1,18 @@
-[tool.poetry]
+[project]
 name = "app-updater"
-version = "0.1.1"
+version = "0.1.2"
 description = ""
-authors = ["CrinitusFeles <crinitusfeles@gmail.com>"]
 license = "MIT"
 readme = "README.md"
+dependencies = [
+    "httpx>=0.28.1",
+    "loguru>=0.7.3",
+    "packaging>=25.0",
+    "qasync>=0.27.1",
+    "tqdm>=4.67.1",
+]
 
-[tool.poetry.dependencies]
-python = "^3.11"
-tqdm = "^4.66.1"
-httpx = "^0.27.2"
-qasync = "^0.27.1"
-loguru = "^0.7.2"
-packaging = "^25.0"
-
-
-[tool.poetry.group.ui.dependencies]
-pyqt6 = "^6.6.1"
-
-[build-system]
-requires = ["poetry-core"]
-build-backend = "poetry.core.masonry.api"
+[project.optional-dependencies]
+ui = [
+    "pyqt6>=6.9.1",
+]
