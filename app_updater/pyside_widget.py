@@ -3,15 +3,18 @@ import sys
 import asyncio
 from pathlib import Path
 import qasync
-from PyQt6.QtCore import pyqtSignal, Qt
-from PyQt6 import QtWidgets, QtGui
 from loguru import logger
 from app_updater.check_for_update import (Release, check_for_updates,
                                           download_release)
+from PySide6 import QtWidgets
+from PySide6 import QtGui
+from PySide6.QtCore import Qt
+from PySide6.QtCore import Signal
 
 
-class UpdateCheckerDialog(QtWidgets.QWidget):
-    download_finished: pyqtSignal = pyqtSignal(int)
+
+class UpdateCheckerDialog(QtWidgets.QWidget): # type: ignore
+    download_finished: Signal = Signal(int)
 
     progress_bar: QtWidgets.QProgressBar
     label: QtWidgets.QLabel
@@ -87,8 +90,6 @@ class UpdateCheckerDialog(QtWidgets.QWidget):
             self.progress_bar.setValue(progress)
         self.progress_bar.setVisible(False)
         self.downoad_finished()
-
-
 
 
 if __name__ == '__main__':

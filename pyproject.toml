@@ -13,6 +13,9 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-ui = [
+pyqt = [
     "pyqt6>=6.9.1",
+]
+pyside = [
+    "pyside6>=6.9.0",
 ]
